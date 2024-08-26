@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detention Timer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #studentForm, #timerSection {
+            margin-bottom: 20px;
+        }
+        input, button {
+            margin: 5px 0;
+        }
+        #timerList {
+            list-style-type: none;
+            padding: 0;
+        }
+        .timer {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .timer-controls button {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Detention Timer</h1>
+    
+    <div id="studentForm">
+        <h2>Add Student</h2>
+        <input type="text" id="studentName" placeholder="Student Name">
+        <input type="number" id="lateMinutes" placeholder="Minutes Late">
+        <button onclick="addStudent()">Add Student</button>
+    </div>
+
+    <div id="timerSection">
+        <h2>Detention Timers</h2>
+        <ul id="timerList"></ul>
+    </div>
+
+    <audio id="alarmSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+        let students = [];
+        const alarmSound = document.getElementById('alarmSound');
+
+        function addStudent() {
+            const nameInput = document.getElementById('studentName');
+            const minutesInput = document.getElementById('lateMinutes');
+            
+            if (!nameInput || !minutesInput) {
+                console.error('Input elements not found');
+                return;
+            }
+
+            const name = nameInput.value.trim();
+            const minutes = parseInt(minutesInput.value);
+            
+            if (name && !isNaN(minutes) && minutes > 0) {
+                const id = Date.now();
+                students.push({ id, name, minutes, timeLeft: minutes * 60, timerStarted: false, isPaused: false });
+                updateTimerList();
+                nameInput.value = '';
+                minutesInput.value = '';
+            } else {
+                alert('Please enter a valid name and positive number of minutes late.');
+            }
+        }
+
+        function updateTimerList() {
+            const timerList = document.getElementById('timerList');
+            if (!timerList) {
+                console.error('Timer list element not found');
+                return;
+            }
+            
+            timerList.innerHTML = '';
+            
+            students.forEach((student, index) => {
+                const li = document.createElement('li');
+                li.className = 'timer';
+                li.innerHTML = `
+                    <strong>${student.name}</strong> - ${student.minutes} minutes
+                    <div id="timer-${student.id}">
+                        ${formatTime(student.timeLeft)}
+                    </div>
+                    <div class="timer-controls">
+                        ${!student.timerStarted ? 
+                            `<button onclick="startTimer(${index})">Start</button>` :
+                            `<button onclick="pauseResumeTimer(${index})">${student.isPaused ? 'Resume' : 'Pause'}</button>`
+                        }
+                        <button onclick="resetTimer(${index})">Reset</button>
+                    </div>
+                `;
+                timerList.appendChild(li);
+            });
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function startTimer(index) {
+            if (index < 0 || index >= students.length) {
+                console.error('Invalid student index');
+                return;
+            }
+
+            const student = students[index];
+            student.timerStarted = true;
+            student.isPaused = false;
+            updateTimerList();
+
+            runTimer(student.id);
+        }
+
+        function runTimer(studentId) {
+            const timerId = setInterval(() => {
+                const studentIndex = students.findIndex(s => s.id === studentId);
+                if (studentIndex === -1) {
+                    clearInterval(timerId);
+                    return;
+                }
+
+                const student = students[studentIndex];
+                if (student.isPaused) {
+                    clearInterval(timerId);
+                    return;
+                }
+
+                const timerElement = document.getElementById(`timer-${student.id}`);
+                if (!timerElement) {
+                    console.log(`Timer stopped for ${student.name}: Element not found`);
+                    clearInterval(timerId);
+                    return;
+                }
+
+                if (student.timeLeft <= 0) {
+                    clearInterval(timerId);
+                    playAlarm();
+                    alert(`${student.name} is free to go!`);
+                    students = students.filter(s => s.id !== student.id);
+                    updateTimerList();
+                } else {
+                    student.timeLeft--;
+                    timerElement.textContent = formatTime(student.timeLeft);
+                }
+            }, 1000);
+        }
+
+        function pauseResumeTimer(index) {
+            if (index < 0 || index >= students.length) {
+                console.error('Invalid student index');
+                return;
+            }
+
+            const student = students[index];
+            student.isPaused = !student.isPaused;
+            
+            if (!student.isPaused) {
+                runTimer(student.id);
+            }
+
+            updateTimerList();
+        }
+
+        function resetTimer(index) {
+            if (index < 0 || index >= students.length) {
+                console.error('Invalid student index');
+                return;
+            }
+
+            const student = students[index];
+            student.timeLeft = student.minutes * 60;
+            student.timerStarted = false;
+            student.isPaused = false;
+            updateTimerList();
+        }
+
+        function playAlarm() {
+            if (alarmSound) {
+                alarmSound.currentTime = 0;
+                alarmSound.play().catch(error => {
+                    console.error('Error playing audio:', error);
+                    alert('ALARM: Time is up! (Sound playback failed)');
+                });
+            } else {
+                console.error('Alarm sound element not found');
+                alert('ALARM: Time is up! (Sound not available)');
+            }
+        }
+
+        updateTimerList();
+    </script>
+</body>
+</html>
