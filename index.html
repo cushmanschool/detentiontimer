@@ -1,209 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detention Timer</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        #studentForm, #timerSection {
-            margin-bottom: 20px;
-        }
-        input, button {
-            margin: 5px 0;
-        }
-        #timerList {
-            list-style-type: none;
-            padding: 0;
-        }
-        .timer {
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        .timer-controls button {
-            margin-right: 5px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detention Timer — The Cushman School</title>
+  <meta name="description" content="Run detention timers for late students. Refresh-safe, readable across the room.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%230E406A'/%3E%3Cpath d='M50 22v30l20 12' stroke='%23F7F7F4' stroke-width='9' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:ital,wght@0,500;0,600;0,700;1,500&family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&family=Fragment+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Detention Timer</h1>
-    
-    <div id="studentForm">
-        <h2>Add Student</h2>
-        <input type="text" id="studentName" placeholder="Student Name">
-        <input type="number" id="lateMinutes" placeholder="Minutes Late">
-        <button onclick="addStudent()">Add Student</button>
+
+  <header class="hero">
+    <div class="hero-inner">
+      <div>
+        <p class="hero-label">The Cushman School &mdash; Upper School</p>
+        <h1>Detention Timer</h1>
+        <p class="hero-sub">Add each student and their minutes. Timers keep running even if this page is refreshed or closed.</p>
+      </div>
+      <time class="wall-clock" id="wallClock" aria-label="Current time">--:--</time>
     </div>
+  </header>
 
-    <div id="timerSection">
-        <h2>Detention Timers</h2>
-        <ul id="timerList"></ul>
-    </div>
+  <main>
+    <section class="add-panel" aria-labelledby="addHeading">
+      <p class="section-label" id="addHeading">Add a student</p>
+      <form id="addForm" novalidate>
+        <div class="field field-name">
+          <label for="studentName">Name</label>
+          <input type="text" id="studentName" autocomplete="off" placeholder="e.g. Jordan M." maxlength="60">
+        </div>
+        <div class="field">
+          <span class="field-label" id="minutesLabel">Minutes</span>
+          <div class="chips" role="group" aria-labelledby="minutesLabel">
+            <button type="button" class="chip" data-minutes="5">5</button>
+            <button type="button" class="chip selected" data-minutes="10" aria-pressed="true">10</button>
+            <button type="button" class="chip" data-minutes="15">15</button>
+            <button type="button" class="chip" data-minutes="20">20</button>
+            <input type="number" id="customMinutes" min="1" max="180" placeholder="other" aria-label="Custom minutes">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Add student</button>
+      </form>
+      <p class="form-error" id="formError" role="alert" hidden></p>
+    </section>
 
-    <audio id="alarmSound" preload="auto">
-        <source src="https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3" type="audio/mpeg">
-        Your browser does not support the audio element.
-    </audio>
+    <section aria-labelledby="timersHeading">
+      <div class="timers-head">
+        <p class="section-label" id="timersHeading">Timers</p>
+        <button type="button" class="btn btn-ghost" id="startAll" hidden>Start all</button>
+      </div>
+      <div class="timer-grid" id="timerGrid"></div>
+      <p class="empty-state" id="emptyState">No students yet. Add a student above to start a timer.</p>
+    </section>
+  </main>
 
-    <script>
-        let students = [];
-        const alarmSound = document.getElementById('alarmSound');
+  <footer>
+    <p>Detention Timer &middot; <a href="https://class.avendano.xyz">class.avendano.xyz</a></p>
+  </footer>
 
-        function addStudent() {
-            const nameInput = document.getElementById('studentName');
-            const minutesInput = document.getElementById('lateMinutes');
-            
-            if (!nameInput || !minutesInput) {
-                console.error('Input elements not found');
-                return;
-            }
-
-            const name = nameInput.value.trim();
-            const minutes = parseInt(minutesInput.value);
-            
-            if (name && !isNaN(minutes) && minutes > 0) {
-                const id = Date.now();
-                students.push({ id, name, minutes, timeLeft: minutes * 60, timerStarted: false, isPaused: false });
-                updateTimerList();
-                nameInput.value = '';
-                minutesInput.value = '';
-            } else {
-                alert('Please enter a valid name and positive number of minutes late.');
-            }
-        }
-
-        function updateTimerList() {
-            const timerList = document.getElementById('timerList');
-            if (!timerList) {
-                console.error('Timer list element not found');
-                return;
-            }
-            
-            timerList.innerHTML = '';
-            
-            students.forEach((student, index) => {
-                const li = document.createElement('li');
-                li.className = 'timer';
-                li.innerHTML = `
-                    <strong>${student.name}</strong> - ${student.minutes} minutes
-                    <div id="timer-${student.id}">
-                        ${formatTime(student.timeLeft)}
-                    </div>
-                    <div class="timer-controls">
-                        ${!student.timerStarted ? 
-                            `<button onclick="startTimer(${index})">Start</button>` :
-                            `<button onclick="pauseResumeTimer(${index})">${student.isPaused ? 'Resume' : 'Pause'}</button>`
-                        }
-                        <button onclick="resetTimer(${index})">Reset</button>
-                    </div>
-                `;
-                timerList.appendChild(li);
-            });
-        }
-
-        function formatTime(seconds) {
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = seconds % 60;
-            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-        }
-
-        function startTimer(index) {
-            if (index < 0 || index >= students.length) {
-                console.error('Invalid student index');
-                return;
-            }
-
-            const student = students[index];
-            student.timerStarted = true;
-            student.isPaused = false;
-            updateTimerList();
-
-            runTimer(student.id);
-        }
-
-        function runTimer(studentId) {
-            const timerId = setInterval(() => {
-                const studentIndex = students.findIndex(s => s.id === studentId);
-                if (studentIndex === -1) {
-                    clearInterval(timerId);
-                    return;
-                }
-
-                const student = students[studentIndex];
-                if (student.isPaused) {
-                    clearInterval(timerId);
-                    return;
-                }
-
-                const timerElement = document.getElementById(`timer-${student.id}`);
-                if (!timerElement) {
-                    console.log(`Timer stopped for ${student.name}: Element not found`);
-                    clearInterval(timerId);
-                    return;
-                }
-
-                if (student.timeLeft <= 0) {
-                    clearInterval(timerId);
-                    playAlarm();
-                    alert(`${student.name} is free to go!`);
-                    students = students.filter(s => s.id !== student.id);
-                    updateTimerList();
-                } else {
-                    student.timeLeft--;
-                    timerElement.textContent = formatTime(student.timeLeft);
-                }
-            }, 1000);
-        }
-
-        function pauseResumeTimer(index) {
-            if (index < 0 || index >= students.length) {
-                console.error('Invalid student index');
-                return;
-            }
-
-            const student = students[index];
-            student.isPaused = !student.isPaused;
-            
-            if (!student.isPaused) {
-                runTimer(student.id);
-            }
-
-            updateTimerList();
-        }
-
-        function resetTimer(index) {
-            if (index < 0 || index >= students.length) {
-                console.error('Invalid student index');
-                return;
-            }
-
-            const student = students[index];
-            student.timeLeft = student.minutes * 60;
-            student.timerStarted = false;
-            student.isPaused = false;
-            updateTimerList();
-        }
-
-        function playAlarm() {
-            if (alarmSound) {
-                alarmSound.currentTime = 0;
-                alarmSound.play().catch(error => {
-                    console.error('Error playing audio:', error);
-                    alert('ALARM: Time is up! (Sound playback failed)');
-                });
-            } else {
-                console.error('Alarm sound element not found');
-                alert('ALARM: Time is up! (Sound not available)');
-            }
-        }
-
-        updateTimerList();
-    </script>
+  <script src="app.js"></script>
 </body>
 </html>
